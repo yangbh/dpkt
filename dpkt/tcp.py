@@ -20,49 +20,50 @@ TCP_WIN_MAX = 65535  # maximum (unscaled) window
 
 
 class TCP(dpkt.Packet):
-    __hdr__ = (
-        ('sport', 'H', 0xdead),
-        ('dport', 'H', 0),
-        ('seq', 'I', 0xdeadbeefL),
-        ('ack', 'I', 0),
-        ('_off', 'B', ((5 << 4) | 0)),
-        ('flags', 'B', TH_SYN),
-        ('win', 'H', TCP_WIN_MAX),
-        ('sum', 'H', 0),
-        ('urp', 'H', 0)
-    )
-    opts = ''
+	__hdr__ = (
+		('sport', 'H', 0xdead),
+		('dport', 'H', 0),
+		('seq', 'I', 0xdeadbeefL),
+		('ack', 'I', 0),
+		('_off', 'B', ((5 << 4) | 0)),
+		('flags', 'B', TH_SYN),
+		('win', 'H', TCP_WIN_MAX),
+		('sum', 'H', 0),
+		('urp', 'H', 0)
+	)
+	opts = ''
 
-    @property
-    def off(self):
-        return self._off >> 4
 
-    @off.setter
-    def off(self, off):
-        self._off = (off << 4) | (self._off & 0xf)
+	@property
+	def off(self):
+		return self._off >> 4
 
-    # Deprecated methods, will be removed in the future
-    # =================================================
-    @deprecated('off')
-    def _get_off(self): return self.off
+	@off.setter
+	def off(self, off):
+		self._off = (off << 4) | (self._off & 0xf)
 
-    @deprecated('off')
-    def _set_off(self, off): self.off = off
-    # =================================================
+	# Deprecated methods, will be removed in the future
+	# =================================================
+	@deprecated('off')
+	def _get_off(self): return self.off
 
-    def __len__(self):
-        return self.__hdr_len__ + len(self.opts) + len(self.data)
+	@deprecated('off')
+	def _set_off(self, off): self.off = off
+	# =================================================
 
-    def __str__(self):
-        return self.pack_hdr() + str(self.opts) + str(self.data)
+	def __len__(self):
+		return self.__hdr_len__ + len(self.opts) + len(self.data)
 
-    def unpack(self, buf):
-        dpkt.Packet.unpack(self, buf)
-        ol = ((self._off >> 4) << 2) - self.__hdr_len__
-        if ol < 0:
-            raise dpkt.UnpackError, 'invalid header length'
-        self.opts = buf[self.__hdr_len__:self.__hdr_len__ + ol]
-        self.data = buf[self.__hdr_len__ + ol:]
+	def __str__(self):
+		return self.pack_hdr() + str(self.opts) + str(self.data)
+
+	def unpack(self, buf):
+		dpkt.Packet.unpack(self, buf)
+		ol = ((self._off >> 4) << 2) - self.__hdr_len__
+		if ol < 0:
+			raise dpkt.UnpackError, 'invalid header length'
+		self.opts = buf[self.__hdr_len__:self.__hdr_len__ + ol]
+		self.data = buf[self.__hdr_len__ + ol:]
 
 # Options (opt_type) - http://www.iana.org/assignments/tcp-parameters
 TCP_OPT_EOL = 0  # end of option list
@@ -95,60 +96,86 @@ TCP_OPT_MAX = 27
 
 
 def parse_opts(buf):
-    """Parse TCP option buffer into a list of (option, data) tuples."""
-    opts = []
-    while buf:
-        o = ord(buf[0])
-        if o > TCP_OPT_NOP:
-            try:
-                # advance buffer at least 2 bytes = 1 type + 1 length
-                l = max(2, ord(buf[1]))
-                d, buf = buf[2:l], buf[l:]
-            except (IndexError, ValueError):
-                # print 'bad option', repr(str(buf))
-                opts.append(None)  # XXX
-                break
-        else:
-            # options 0 and 1 are not followed by length byte
-            d, buf = '', buf[1:]
-        opts.append((o, d))
-    return opts
+	"""Parse TCP option buffer into a list of (option, data) tuples."""
+	opts = []
+	while buf:
+		o = ord(buf[0])
+		if o > TCP_OPT_NOP:
+			try:
+				# advance buffer at least 2 bytes = 1 type + 1 length
+				l = max(2, ord(buf[1]))
+				d, buf = buf[2:l], buf[l:]
+			except (IndexError, ValueError):
+				# print 'bad option', repr(str(buf))
+				opts.append(None)  # XXX
+				break
+		else:
+			# options 0 and 1 are not followed by length byte
+			d, buf = '', buf[1:]
+		opts.append((o, d))
+	return opts
 
 
 def test_parse_opts():
-    # normal scenarios
-    buf = '\x02\x04\x23\x00\x01\x01\x04\x02'
-    opts = parse_opts(buf)
-    assert opts == [
-        (TCP_OPT_MSS, '\x23\x00'),
-        (TCP_OPT_NOP, ''),
-        (TCP_OPT_NOP, ''),
-        (TCP_OPT_SACKOK, '')
-    ]
+	# normal scenarios
+	buf = '\x02\x04\x23\x00\x01\x01\x04\x02'
+	opts = parse_opts(buf)
+	assert opts == [
+		(TCP_OPT_MSS, '\x23\x00'),
+		(TCP_OPT_NOP, ''),
+		(TCP_OPT_NOP, ''),
+		(TCP_OPT_SACKOK, '')
+	]
 
-    buf = '\x01\x01\x05\x0a\x37\xf8\x19\x70\x37\xf8\x29\x78'
-    opts = parse_opts(buf)
-    assert opts == [
-        (TCP_OPT_NOP, ''),
-        (TCP_OPT_NOP, ''),
-        (TCP_OPT_SACK, '\x37\xf8\x19\x70\x37\xf8\x29\x78')
-    ]
+	buf = '\x01\x01\x05\x0a\x37\xf8\x19\x70\x37\xf8\x29\x78'
+	opts = parse_opts(buf)
+	assert opts == [
+		(TCP_OPT_NOP, ''),
+		(TCP_OPT_NOP, ''),
+		(TCP_OPT_SACK, '\x37\xf8\x19\x70\x37\xf8\x29\x78')
+	]
 
-    # test a zero-length option
-    buf = '\x02\x00\x01'
-    opts = parse_opts(buf)
-    assert opts == [
-        (TCP_OPT_MSS, ''),
-        (TCP_OPT_NOP, '')
-    ]
+	# test a zero-length option
+	buf = '\x02\x00\x01'
+	opts = parse_opts(buf)
+	assert opts == [
+		(TCP_OPT_MSS, ''),
+		(TCP_OPT_NOP, '')
+	]
 
-    # test a one-byte malformed option
-    buf = '\xff'
-    opts = parse_opts(buf)
-    assert opts == [None]
+	# test a one-byte malformed option
+	buf = '\xff'
+	opts = parse_opts(buf)
+	assert opts == [None]
 
+# @profile
+def test_packet():
+	# import tcp
+	# import ip
+	# import ethernet
+	srcmac = '\x0c\xdaAw{\x06'
+	dstmac = '\xac\x87\xa3<}\x88'
+	srcip = 'z\xe1\xe3\xa8'
+	dstip = '\nG1\xe4'
+	sport = 80
+	dport = 8080
+
+	for i in xrange(10000):
+		t = TCP(sport=sport,dport=dport,flags=0x02,seq=0,ack=0,win=0x2000)
+		# i = ip.IP(dst=dnet.ip_aton(dstip),
+		# 		  src=dnet.ip_aton(Localip),
+		# 		  p=ip.IP_PROTO_TCP,
+		# 		  data=t)
+		# i.len = i.__len__()
+		#
+		# e = ethernet.Ethernet(
+		# 	dst=dstmac,
+		# 	src=srcmac,
+		# 	data=i)
 
 if __name__ == '__main__':
-    # Runs all the test associated with this class/file
-    test_parse_opts()
-    print 'Tests Successful...'
+	# Runs all the test associated with this class/file
+	# test_parse_opts()
+	# print 'Tests Successful...'
+
+	test_packet()

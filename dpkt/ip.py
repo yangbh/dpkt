@@ -21,14 +21,19 @@ class IP(dpkt.Packet):
     )
     _protosw = {}
     opts = ''
-    
+
+    # for k in __hdr_fields__:
+    #     setattr(self, k, copy.copy(self.__hdr_defaults__[k]))
+
     def __init__(self, *args, **kwargs):
         super(IP, self).__init__(*args, **kwargs)
-        
+
         # If IP packet is not initialized by string and the len field has
         # been rewritten.
         if not args and 'len' not in kwargs:
+            # print self.__len__()
             self.len = self.__len__()
+            # print self.len
 
     @property
     def v(self):
@@ -70,12 +75,15 @@ class IP(dpkt.Packet):
 
     def __str__(self):
         self.len = self.__len__()
+        str_pack_hdr = self.pack_hdr()
+        str_opts = str(self.opts)
+        str_data = str(self.data)
         if self.sum == 0:
-            self.sum = dpkt.in_cksum(self.pack_hdr() + str(self.opts))
+            self.sum = dpkt.in_cksum(str_pack_hdr + str_opts)
             if (self.p == 6 or self.p == 17) and (self.off & (IP_MF | IP_OFFMASK)) == 0 and \
                     isinstance(self.data, dpkt.Packet) and self.data.sum == 0:
                 # Set zeroed TCP and UDP checksums for non-fragments.
-                p = str(self.data)
+                p = str_data
                 s = dpkt.struct.pack('>4s4sxBH', self.src, self.dst,
                                      self.p, len(p))
                 s = dpkt.in_cksum_add(0, s)
@@ -84,7 +92,28 @@ class IP(dpkt.Packet):
                 if self.p == 17 and self.data.sum == 0:
                     self.data.sum = 0xffff  # RFC 768
                     # XXX - skip transports which don't need the pseudoheader
-        return self.pack_hdr() + str(self.opts) + str(self.data)
+        # str(self.opts)
+        # return ''
+        return str_pack_hdr + str_opts + str_data
+
+    # def __str__(self):
+    #     self.len = self.__len__()
+    #     if self.sum == 0:
+    #         self.sum = dpkt.in_cksum(self.pack_hdr() + str(self.opts))
+    #         if (self.p == 6 or self.p == 17) and (self.off & (IP_MF | IP_OFFMASK)) == 0 and \
+    #                 isinstance(self.data, dpkt.Packet) and self.data.sum == 0:
+    #             # Set zeroed TCP and UDP checksums for non-fragments.
+    #             p = str(self.data)
+    #             s = dpkt.struct.pack('>4s4sxBH', self.src, self.dst,
+    #                                  self.p, len(p))
+    #             s = dpkt.in_cksum_add(0, s)
+    #             s = dpkt.in_cksum_add(s, p)
+    #             self.data.sum = dpkt.in_cksum_done(s)
+    #             if self.p == 17 and self.data.sum == 0:
+    #                 self.data.sum = 0xffff  # RFC 768
+    #                 # XXX - skip transports which don't need the pseudoheader
+    #     return self.pack_hdr() + str(self.opts) + str(self.data)
+
 
     def unpack(self, buf):
         dpkt.Packet.unpack(self, buf)

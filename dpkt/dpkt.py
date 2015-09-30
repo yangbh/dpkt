@@ -24,20 +24,27 @@ class NeedData(UnpackError):
 class PackError(Error):
     pass
 
-
 class _MetaPacket(type):
+    # @profile
     def __new__(cls, clsname, clsbases, clsdict):
+        from pprint import pprint
+        # pprint((cls, clsname, clsbases, clsdict))
         t = type.__new__(cls, clsname, clsbases, clsdict)
         st = getattr(t, '__hdr__', None)
         if st is not None:
             # XXX - __slots__ only created in __new__()
             clsdict['__slots__'] = [x[0] for x in st] + ['data']
             t = type.__new__(cls, clsname, clsbases, clsdict)
+            # pprint(vars(t))
             t.__hdr_fields__ = [x[0] for x in st]
             t.__hdr_fmt__ = getattr(t, '__byte_order__', '>') + ''.join([x[1] for x in st])
             t.__hdr_len__ = struct.calcsize(t.__hdr_fmt__)
             t.__hdr_defaults__ = dict(zip(
                 t.__hdr_fields__, [x[2] for x in st]))
+            for x in st:
+                setattr(t,x[0],x[2])
+            # pprint(vars(t))
+        # pprint((cls, clsname, clsbases, clsdict))
         return t
 
 
@@ -71,6 +78,7 @@ class Packet(object):
     """
     __metaclass__ = _MetaPacket
 
+    # @profile
     def __init__(self, *args, **kwargs):
         """Packet constructor with ([buf], [field=val,...]) prototype.
 
@@ -91,8 +99,12 @@ class Packet(object):
                 raise UnpackError('invalid %s: %r' %
                                   (self.__class__.__name__, args[0]))
         else:
-            for k in self.__hdr_fields__:
-                setattr(self, k, copy.copy(self.__hdr_defaults__[k]))
+            # from pprint import pprint
+            # pprint(self.__hdr_fields__)
+            # pprint(kwargs.iteritems())
+            # for k in self.__hdr_fields__:
+            #     setattr(self, k, copy.copy(self.__hdr_defaults__[k]))
+                # setattr(self, k, self.__hdr_defaults__[k])
             for k, v in kwargs.iteritems():
                 setattr(self, k, v)
 
@@ -138,6 +150,7 @@ class Packet(object):
     def __str__(self):
         return self.pack_hdr() + str(self.data)
 
+    # @profile
     def pack_hdr(self):
         """Return packed header string."""
         try:
